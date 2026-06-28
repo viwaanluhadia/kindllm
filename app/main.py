@@ -1,6 +1,8 @@
 import os
 import httpx
-from fastapi import FastAPI, Request, Form
+import json
+import urllib.parse
+from fastapi import FastAPI, Request, Form, Response, Cookie
 from fastapi.responses import HTMLResponse
 from duckduckgo_search import DDGS
 import markdown
@@ -12,14 +14,14 @@ SYSTEM_PROMPT = (
     "CRITICAL RULES:\n"
     "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
     "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix/formula layout.\n"
-    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, use the provided live search context details directly to answer. Summarize the major top headlines immediately. Do not ask the user to provide the context block.\n"
-    "4. Keep descriptions brief, direct, and conversational so it fits clean, narrow e-ink viewports without long paragraphs or conversational fluff."
+    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, use the provided live search context details directly to answer. Summarize major points immediately.\n"
+    "4. CONVERSATION HISTORY: You are part of a continuous conversation. Use the chat history to understand follow-up questions, pronouns, or context. Keep descriptions brief, direct, and conversational."
 )
 
 def search_web(query: str) -> str:
     try:
         with DDGS() as ddgs:
-            results = [r for r in ddgs.text(query, max_results=5)]
+            results = [r for r in ddgs.text(query, max_results=4)]
             if not results:
                 return ""
             blob = "\n".join([f"Source: {r['title']}\nContext: {r['body']}" for r in results])
@@ -34,7 +36,10 @@ async def read_index():
     return HTMLResponse(content=page)
 
 @app.post("/", response_class=HTMLResponse)
-async def handle_inquiry(inquiry: str = Form(...)):
+async def handle_inquiry(
+    inquiry: str = Form(...),
+    chat_history: str = Cookie(default=None)
+):
     from app.templates import HTML_TEMPLATE
     
     api_key = os.getenv("LLM_API_KEY")
@@ -43,31 +48,48 @@ async def handle_inquiry(inquiry: str = Form(...)):
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
         return HTMLResponse(content=page)
     
+    # Parse existing chat history from cookie safely
+    history = []
+    if chat_history:
+        try:
+            history = json.loads(urllib.parse.unquote(chat_history))
+        except Exception:
+            history = []
+
+    # Check if we need real-time context
     search_keywords = ["search", "weather", "news", "today", "current", "latest"]
     context = ""
     if any(kw in inquiry.lower() for kw in search_keywords):
         context = search_web(inquiry)
-        # Fallback if live scrape was completely blank or rate-limited
         if not context:
-            context = "\n\n[Live Web Search Context]: No active search results found. Provide a generalized summary of recent expected trends if specific details are unavailable."
+            context = "\n\n[Live Web Search Context]: No active search results found. Summarize generalized trends."
+
+    # Build the payload message array
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    
+    # Append past context conversations (Keep last 6 turns to avoid bloated cookies on Kindle)
+    for turn in history[-6:]:
+        messages.append({"role": "user", "content": turn["user"]})
+        messages.append({"role": "assistant", "content": turn["assistant"]})
         
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"{inquiry}{context}"}
-    ]
+    # Append current input with its real-time context
+    messages.append({"role": "user", "content": f"{inquiry}{context}"})
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.2}
+                json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.4}
             )
             res_json = res.json()
             
             if "choices" in res_json:
                 raw_markdown = res_json["choices"][0]["message"]["content"]
                 html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
+                
+                # Append clean data to our local history tracking
+                history.append({"user": inquiry, "assistant": raw_markdown})
             else:
                 error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
                 html_response = f"<p style='color:red;'>API Error: {error_msg}</p>"
@@ -83,4 +105,10 @@ async def handle_inquiry(inquiry: str = Form(...)):
     """
     
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", dynamic_content)
-    return HTMLResponse(content=page)
+    response = HTMLResponse(content=page)
+    
+    # Save the updated history back into the browser cookie (Expires in 24 hours)
+    updated_history_str = urllib.parse.quote(json.dumps(history[-8:]))
+    response.set_cookie(key="chat_history", value=updated_history_str, max_age=86400, httponly=True)
+    
+    return response
