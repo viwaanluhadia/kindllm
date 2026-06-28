@@ -14,7 +14,7 @@ SYSTEM_PROMPT = (
     "CRITICAL RULES:\n"
     "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
     "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix/formula layout.\n"
-    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, use the provided live search context details directly to answer. Summarize major points immediately. Never state you lack access if data is appended below.\n"
+    "3. REAL-TIME DATA: If the user asks about current events, regional news, topics, or weather, use the provided live search context details directly to answer. Summarize major points immediately. Never state you lack access if data is appended below.\n"
     "4. CONVERSATION HISTORY: You are part of a continuous conversation. Use the chat history to understand follow-up questions, pronouns, or context. Keep descriptions brief, direct, and conversational."
 )
 
@@ -62,8 +62,8 @@ async def handle_inquiry(
         except Exception:
             history = []
 
-    # Detect if search is triggered
-    search_keywords = ["search", "weather", "news", "today", "current", "latest"]
+    # Broadened matching parameters to catch general info queries, topics, and places
+    search_keywords = ["search", "weather", "news", "today", "current", "latest", "in india", "topics", "happening", "status"]
     is_search_query = any(kw in inquiry.lower() for kw in search_keywords)
     
     context = ""
@@ -74,9 +74,7 @@ async def handle_inquiry(
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     
-    # Safely inject past history turns
     for turn in history[-6:]:
-        # CRITICAL FIX: If we are looking up real-time news right now, strip out old hallucinated data restrictions from memory
         if is_search_query and "real-time data" in turn["assistant"].lower():
             continue
         messages.append({"role": "user", "content": turn["user"]})
