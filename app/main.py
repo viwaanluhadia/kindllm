@@ -35,9 +35,10 @@ async def read_index():
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
     return HTMLResponse(content=page)
 
+# Bulletproof routing: Handles BOTH link clicks (GET) and old cached forms (POST)
 @app.get("/clear")
+@app.post("/clear")
 async def clear_chat():
-    # Listens for the clean hyperlink, drops the cookie, and cleanly routes home
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie(key="chat_history")
     return response
