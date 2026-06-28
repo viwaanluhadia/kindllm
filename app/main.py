@@ -1,77 +1,71 @@
 import os
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse
-from jinja2 import Template
 import httpx
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from duckduckgo_search import DDGS
-from app.templates import HTML_TEMPLATE
+import markdown
 
 app = FastAPI()
-template_engine = Template(HTML_TEMPLATE)
 
-API_URL = "https://api.groq.com/openai/v1/chat/completions"
-API_KEY = os.environ.get("LLM_API_KEY")
+# System prompt optimized for structural layout (Tables, Lists, Bold text)
+SYSTEM_PROMPT = (
+    "You are a minimalist reading companion optimized for an e-ink Kindle screen. "
+    "Respond using clean formatting. Always use standard markdown tables when doing comparisons, "
+    "differentiations, or presenting structured data. Use bullet points and bold text for clarity "
+    "where appropriate. Avoid chaotic or overly dense layouts, keeping tables clear and readable."
+)
 
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    initial_text = "KindLLM Online with Live Web Search. Ask me anything current."
-    rendered_html = template_engine.render(prompt="", response=initial_text)
-    return HTMLResponse(content=rendered_html)
-
-@app.post("/", response_class=HTMLResponse)
-async def handle_prompt(prompt: str = Form(...)):
-    if not API_KEY:
-        rendered_html = template_engine.render(
-            prompt=prompt, 
-            response="Error: Server missing LLM_API_KEY."
-        )
-        return HTMLResponse(content=rendered_html)
-
-    # 1. Fetch real-time web context before querying the LLM
-    web_context = ""
+def search_web(query: str) -> str:
     try:
         with DDGS() as ddgs:
-            search_results = [r for r in ddgs.text(prompt, max_results=3)]
-            web_context = "\n".join([f"Source: {res['body']}" for res in search_results])
+            results = [r for r in ddgs.text(query, max_results=3)]
+            if not results:
+                return ""
+            blob = "\n".join([f"Source: {r['title']}\nContext: {r['body']}" for r in results])
+            return f"\n\n[Live Web Search Context]:\n{blob}"
     except Exception:
-        web_context = "No recent web data pulled due to connection limits."
+        return ""
 
-    # 2. Package context inside the payload
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {
-                "role": "system", 
-                "content": (
-                    "You are KindLLM, a hyper-accurate reading assistant for an e-ink Kindle device. "
-                    "You are given real-time web snippets to accurately answer recent events or dynamic facts. "
-                    "Respond in clean, brief paragraphs. Strictly avoid markdown asterisks (**), bullet blocks, or code tags, "
-                    "as they break formatting on basic e-ink setups. Keep the spacing elegant."
-                )
-            },
-            {
-                "role": "user", 
-                "content": f"Live Web Context:\n{web_context}\n\nUser Question: {prompt}"
-            }
-        ],
-        "temperature": 0.3
-    }
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    from app.templates import HTML_TEMPLATE
+    # Render empty state
+    return HTML_TEMPLATE.format(inquiry="", response="")
+
+@app.post("/", response_class=HTMLResponse)
+async def handle_inquiry(inquiry: str = Form(...)):
+    from app.templates import HTML_TEMPLATE
     
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(API_URL, json=payload, headers=headers, timeout=30.0)
-            if response.status_code == 200:
-                result = response.json()
-                ai_response = result['choices'][0]['message']['content']
-            else:
-                ai_response = f"API Error: Received code {response.status_code} from provider."
-        except httpx.RequestError as exc:
-            ai_response = f"Network Connection Failure: {exc}"
-
-    rendered_html = template_engine.render(prompt=prompt, response=ai_response)
-    return HTMLResponse(content=rendered_html)
+    api_key = os.getenv("LLM_API_KEY")
+    if not api_key:
+        return HTML_TEMPLATE.format(inquiry=inquiry, response="<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>")
+    
+    # Check if the query asks for fresh information to trigger search
+    search_keywords = ["search", "weather", "news", "today", "current", "latest", "versus", "diff", "compare"]
+    context = ""
+    if any(kw in inquiry.lower() for kw in search_keywords):
+        context = search_web(inquiry)
+        
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"{inquiry}{context}"}
+    ]
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"model": "llama3-8b-8192", "messages": messages, "temperature": 0.3}
+            )
+            res_json = res.json()
+            raw_markdown = res_json["choices"][0]["message"]["content"]
+            
+            # Convert the markdown response (including tables) into HTML
+            html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
+            
+    except Exception as e:
+        html_response = f"<p style='color:red;'>Connection Error: {str(e)}</p>"
+        
+    return HTML_TEMPLATE.format(inquiry=inquiry, response=html_response)
