@@ -59,7 +59,7 @@ async def handle_inquiry(inquiry: str = Form(...)):
             res = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": "llama-3.1-70b-versatile", "messages": messages, "temperature": 0.2}
+                json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.2}
             )
             res_json = res.json()
             
