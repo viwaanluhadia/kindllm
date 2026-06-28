@@ -7,14 +7,14 @@ import markdown
 
 app = FastAPI()
 
-# Balanced prompt: Use tables ONLY when explicitly requested or presenting structured datasets/rules
+# Updated prompt to explicitly force the model to read real-time context data
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
     "CRITICAL RULES:\n"
     "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
     "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix/formula layout.\n"
-    "3. When building requested tables, include clear headers (like 'Form/Rule', 'Example') and keep cell content concise so it scales beautifully on narrow screens.\n"
-    "4. Skip conversational fluff like 'Sure, here is the table:'—just jump straight into the requested layout."
+    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, you will see a '[Live Web Search Context]' attached to their message. You MUST use this data to provide the latest real-time updates. Never claim you don't have access to real-time information if the context block is provided.\n"
+    "4. Keep descriptions brief, direct, and conversational so it fits clean, narrow e-ink viewports without long paragraphs or conversational fluff."
 )
 
 def search_web(query: str) -> str:
