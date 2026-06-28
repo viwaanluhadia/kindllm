@@ -5,7 +5,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KindLLM</title>
     <style>
-        body {{
+        body {
             font-family: Georgia, serif;
             background-color: #ffffff;
             color: #000000;
@@ -13,74 +13,77 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 20px;
             font-size: 18px;
             line-height: 1.6;
-        }}
-        .container {{
+        }
+        .container {
             max-width: 800px;
             margin: 0 auto;
-        }}
-        h1 {{
+        }
+        h1 {
             text-align: center;
             font-size: 28px;
             margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 1px;
-        }}
-        .subtitle {{
+        }
+        .subtitle {
             text-align: center;
             font-size: 12px;
             color: #555555;
             text-transform: uppercase;
             letter-spacing: 2px;
             margin-bottom: 30px;
-        }}
-        hr {{
+        }
+        hr {
             border: 0;
             border-top: 1px solid #000000;
             margin-bottom: 30px;
-        }}
-        .section-label {{
+        }
+        .section-label {
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #333333;
             font-weight: bold;
             margin-bottom: 5px;
-        }}
-        .query-text {{
+        }
+        .query-text {
             font-style: italic;
             margin-bottom: 30px;
             padding-left: 10px;
             border-left: 2px solid #000000;
-        }}
-        .response-body {{
+        }
+        .response-body {
             margin-bottom: 40px;
-        }}
-        table {{
+        }
+        
+        /* Fixed, high-contrast grid lines for Kindle e-ink tables */
+        table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
             font-size: 16px;
-        }}
-        th, td {{
-            border: 1px solid #000000;
+        }
+        th, td {
+            border: 1px solid #000000 !important;
             padding: 10px;
             text-align: left;
-        }}
-        th {{
+        }
+        th {
             background-color: #f2f2f2;
             font-weight: bold;
-        }}
-        ul, ol {{
+        }
+        ul, ol {
             padding-left: 25px;
             margin: 15px 0;
-        }}
-        li {{
+        }
+        li {
             margin-bottom: 5px;
-        }}
-        .input-area {{
+        }
+        
+        .input-area {
             margin-top: 50px;
-        }}
-        textarea {{
+        }
+        textarea {
             width: 100%;
             height: 100px;
             padding: 15px;
@@ -91,8 +94,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             resize: none;
             background-color: #ffffff;
             color: #000000;
-        }}
-        button {{
+        }
+        button {
             width: 100%;
             background-color: #000000;
             color: #ffffff;
@@ -104,7 +107,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             cursor: pointer;
             margin-top: 15px;
             letter-spacing: 1px;
-        }}
+        }
     </style>
 </head>
 <body>
@@ -113,7 +116,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="subtitle">Minimal Reading Companion</div>
         <hr>
 
-        {content}
+        RENDERED_CONTENT_PLACEHOLDER
 
         <div class="input-area">
             <form method="POST" action="/">
@@ -124,4 +127,4 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 </body>
 </html>
-"""s
+"""
