@@ -7,20 +7,19 @@ import markdown
 
 app = FastAPI()
 
-# Updated prompt to explicitly force the model to read real-time context data
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
     "CRITICAL RULES:\n"
     "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
     "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix/formula layout.\n"
-    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, you will see a '[Live Web Search Context]' attached to their message. You MUST use this data to provide the latest real-time updates. Never claim you don't have access to real-time information if the context block is provided.\n"
+    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, use the provided live search context details directly to answer. Summarize the major top headlines immediately. Do not ask the user to provide the context block.\n"
     "4. Keep descriptions brief, direct, and conversational so it fits clean, narrow e-ink viewports without long paragraphs or conversational fluff."
 )
 
 def search_web(query: str) -> str:
     try:
         with DDGS() as ddgs:
-            results = [r for r in ddgs.text(query, max_results=3)]
+            results = [r for r in ddgs.text(query, max_results=5)]
             if not results:
                 return ""
             blob = "\n".join([f"Source: {r['title']}\nContext: {r['body']}" for r in results])
@@ -48,6 +47,9 @@ async def handle_inquiry(inquiry: str = Form(...)):
     context = ""
     if any(kw in inquiry.lower() for kw in search_keywords):
         context = search_web(inquiry)
+        # Fallback if live scrape was completely blank or rate-limited
+        if not context:
+            context = "\n\n[Live Web Search Context]: No active search results found. Provide a generalized summary of recent expected trends if specific details are unavailable."
         
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
