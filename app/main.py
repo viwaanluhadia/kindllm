@@ -8,18 +8,16 @@ import markdown
 
 app = FastAPI()
 
-# System prompt optimized for structural layout (Tables, Lists, Bold text)
+# Strict minimalist prompt ensuring structural outputs
 SYSTEM_PROMPT = (
-    "You are a strict data formatting assistant optimized for an e-ink Kindle screen.\n\n"
-    "CRITICAL MANDATE:\n"
-    "1. NEVER output structured rules, grammar forms, or comparisons as plain text lists or paragraphs.\n"
-    "2. You MUST use standard markdown table formatting with pipe operators ('|') and hyphens ('| :--- |') for ALL structural data.\n"
-    "3. Keep cell content ultra-short so it fits on narrow e-reader viewports.\n\n"
-    "EXACT TABLE TEMPLATE TO USE:\n"
-    "| Tense Form | Structural Rule | Example |\n"
-    "| :--- | :--- | :--- |\n"
-    "| Present Simple | S + V1 (s/es) | I write code |\n"
+    "You are a minimalist data assistant optimized for an e-ink Kindle screen.\n\n"
+    "CRITICAL RULES:\n"
+    "1. For all structural rules, tense forms, comparisons, or differentiations, you MUST use standard markdown tables.\n"
+    "2. Always include a column for the structural sentence format/formula (e.g., S + V1 + O).\n"
+    "3. Keep text brief and structured so it scales beautifully on narrow layouts.\n"
+    "4. Do not include long conversational introduction or conclusion paragraphs."
 )
+
 def search_web(query: str) -> str:
     try:
         with DDGS() as ddgs:
@@ -34,7 +32,6 @@ def search_web(query: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
     from app.templates import HTML_TEMPLATE
-    # Render empty state
     return HTML_TEMPLATE.format(inquiry="", response="")
 
 @app.post("/", response_class=HTMLResponse)
@@ -45,8 +42,7 @@ async def handle_inquiry(inquiry: str = Form(...)):
     if not api_key:
         return HTML_TEMPLATE.format(inquiry=inquiry, response="<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>")
     
-    # Check if the query asks for fresh information to trigger search
-    search_keywords = ["search", "weather", "news", "today", "current", "latest", "versus", "diff", "compare"]
+    search_keywords = ["search", "weather", "news", "today", "current", "latest"]
     context = ""
     if any(kw in inquiry.lower() for kw in search_keywords):
         context = search_web(inquiry)
@@ -61,12 +57,12 @@ async def handle_inquiry(inquiry: str = Form(...)):
             res = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": "llama3-70b-8192",, "messages": messages, "temperature": 0.3}
+                json={"model": "llama3-70b-8192", "messages": messages, "temperature": 0.2}
             )
             res_json = res.json()
             raw_markdown = res_json["choices"][0]["message"]["content"]
             
-            # Convert the markdown response (including tables) into HTML
+            # CRITICAL FIX: Explicitly compiling the markdown table structure into hard HTML elements
             html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
             
     except Exception as e:
