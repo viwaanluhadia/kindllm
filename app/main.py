@@ -14,7 +14,7 @@ SYSTEM_PROMPT = (
     "CRITICAL RULES:\n"
     "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
     "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix/formula layout.\n"
-    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, use the provided live search context details directly to answer. Summarize major points immediately.\n"
+    "3. REAL-TIME DATA: If the user asks about current events, news, or weather, use the provided live search context details directly to answer. Summarize major points immediately. Never state you lack access if data is appended below.\n"
     "4. CONVERSATION HISTORY: You are part of a continuous conversation. Use the chat history to understand follow-up questions, pronouns, or context. Keep descriptions brief, direct, and conversational."
 )
 
@@ -35,7 +35,6 @@ async def read_index():
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
     return HTMLResponse(content=page)
 
-# Bulletproof routing: Handles BOTH link clicks (GET) and old cached forms (POST)
 @app.get("/clear")
 @app.post("/clear")
 async def clear_chat():
@@ -63,16 +62,23 @@ async def handle_inquiry(
         except Exception:
             history = []
 
+    # Detect if search is triggered
     search_keywords = ["search", "weather", "news", "today", "current", "latest"]
+    is_search_query = any(kw in inquiry.lower() for kw in search_keywords)
+    
     context = ""
-    if any(kw in inquiry.lower() for kw in search_keywords):
+    if is_search_query:
         context = search_web(inquiry)
         if not context:
-            context = "\n\n[Live Web Search Context]: No active search results found. Summarize generalized trends."
+            context = "\n\n[Live Web Search Context]: No active search results found. Summarize general ongoing global occurrences."
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     
+    # Safely inject past history turns
     for turn in history[-6:]:
+        # CRITICAL FIX: If we are looking up real-time news right now, strip out old hallucinated data restrictions from memory
+        if is_search_query and "real-time data" in turn["assistant"].lower():
+            continue
         messages.append({"role": "user", "content": turn["user"]})
         messages.append({"role": "assistant", "content": turn["assistant"]})
         
@@ -83,7 +89,7 @@ async def handle_inquiry(
             res = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.4}
+                json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.3}
             )
             res_json = res.json()
             
