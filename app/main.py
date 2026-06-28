@@ -3,7 +3,7 @@ import httpx
 import json
 import urllib.parse
 from fastapi import FastAPI, Request, Form, Response, Cookie
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from duckduckgo_search import DDGS
 import markdown
 
@@ -35,6 +35,13 @@ async def read_index():
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
     return HTMLResponse(content=page)
 
+@app.get("/clear")
+async def clear_chat():
+    # Listens for the clean hyperlink, drops the cookie, and cleanly routes home
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie(key="chat_history")
+    return response
+
 @app.post("/", response_class=HTMLResponse)
 async def handle_inquiry(
     inquiry: str = Form(...),
@@ -48,7 +55,6 @@ async def handle_inquiry(
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
         return HTMLResponse(content=page)
     
-    # Parse existing chat history from cookie safely
     history = []
     if chat_history:
         try:
@@ -56,7 +62,6 @@ async def handle_inquiry(
         except Exception:
             history = []
 
-    # Check if we need real-time context
     search_keywords = ["search", "weather", "news", "today", "current", "latest"]
     context = ""
     if any(kw in inquiry.lower() for kw in search_keywords):
@@ -64,15 +69,12 @@ async def handle_inquiry(
         if not context:
             context = "\n\n[Live Web Search Context]: No active search results found. Summarize generalized trends."
 
-    # Build the payload message array
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     
-    # Append past context conversations (Keep last 6 turns to avoid bloated cookies on Kindle)
     for turn in history[-6:]:
         messages.append({"role": "user", "content": turn["user"]})
         messages.append({"role": "assistant", "content": turn["assistant"]})
         
-    # Append current input with its real-time context
     messages.append({"role": "user", "content": f"{inquiry}{context}"})
     
     try:
@@ -87,8 +89,6 @@ async def handle_inquiry(
             if "choices" in res_json:
                 raw_markdown = res_json["choices"][0]["message"]["content"]
                 html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
-                
-                # Append clean data to our local history tracking
                 history.append({"user": inquiry, "assistant": raw_markdown})
             else:
                 error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
@@ -107,7 +107,6 @@ async def handle_inquiry(
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", dynamic_content)
     response = HTMLResponse(content=page)
     
-    # Save the updated history back into the browser cookie (Expires in 24 hours)
     updated_history_str = urllib.parse.quote(json.dumps(history[-8:]))
     response.set_cookie(key="chat_history", value=updated_history_str, max_age=86400, httponly=True)
     
