@@ -7,7 +7,7 @@ import markdown
 
 app = FastAPI()
 
-# Restoring the clean, hyper-strict layout instructions
+# Strict minimalist prompt ensuring structural outputs
 SYSTEM_PROMPT = (
     "You are a strict, minimalist data assistant optimized for an e-ink Kindle screen.\n\n"
     "CRITICAL MANDATES:\n"
@@ -31,7 +31,6 @@ def search_web(query: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
     from app.templates import HTML_TEMPLATE
-    # Safely replace using static substring swaps to bypass format mapping crashes
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
     return HTMLResponse(content=page)
 
@@ -60,13 +59,12 @@ async def handle_inquiry(inquiry: str = Form(...)):
             res = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": "llama3-70b-8192", "messages": messages, "temperature": 0.2}
+                json={"model": "llama-3.1-70b-versatile", "messages": messages, "temperature": 0.2}
             )
             res_json = res.json()
             
             if "choices" in res_json:
                 raw_markdown = res_json["choices"][0]["message"]["content"]
-                # Explicitly compiling markdown tables with dedicated extensions
                 html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
             else:
                 error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
