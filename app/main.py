@@ -1,12 +1,13 @@
 import os
 import httpx
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from duckduckgo_search import DDGS
 import markdown
 
 app = FastAPI()
 
+# System prompt configured for clean layouts, tables, and live data
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
     "CRITICAL RULES:\n"
@@ -18,7 +19,6 @@ SYSTEM_PROMPT = (
 
 def search_web(query: str) -> str:
     try:
-        # Switching to the news-specific endpoint which has different scraping guardrails
         with DDGS() as ddgs:
             results = [r for r in ddgs.news(query, max_results=5)]
             if not results:
@@ -33,6 +33,11 @@ async def read_index():
     from app.templates import HTML_TEMPLATE
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
     return HTMLResponse(content=page)
+
+# FIXES THE ERROR: Explicitly defines the /clear endpoint to handle the template button cleanly
+@app.get("/clear")
+async def clear_chat():
+    return RedirectResponse(url="/")
 
 @app.post("/", response_class=HTMLResponse)
 async def handle_inquiry(inquiry: str = Form(...)):
