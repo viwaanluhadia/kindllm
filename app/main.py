@@ -10,12 +10,11 @@ app = FastAPI()
 
 # System prompt optimized for structural layout (Tables, Lists, Bold text)
 SYSTEM_PROMPT = (
-    "You are a minimalist reading companion optimized for an e-ink Kindle screen. "
-    "Respond using clean formatting. Always use standard markdown tables when doing comparisons, "
-    "differentiations, or presenting structured data. Use bullet points and bold text for clarity "
-    "where appropriate. Avoid chaotic or overly dense layouts, keeping tables clear and readable."
+    "You are a strict, minimalist data assistant for an e-ink Kindle screen. "
+    "CRITICAL RULE: Never write comparisons, rules, lists, or structured data as long paragraphs. "
+    "If the user asks for rules, comparisons, or differentiation, you MUST use a clean markdown table. "
+    "Use '| Column |' syntax to build standard tables. Keep text inside cells brief and high-contrast."
 )
-
 def search_web(query: str) -> str:
     try:
         with DDGS() as ddgs:
