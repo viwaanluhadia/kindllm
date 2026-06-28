@@ -109,14 +109,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             letter-spacing: 1px;
         }
         .clear-btn {
+            display: inline-block;
             background-color: #ffffff;
             color: #000000;
             border: 1px solid #000000;
             padding: 6px 12px;
             font-size: 11px;
-            width: auto;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
             margin-top: 5px;
-            display: inline-block;
+            font-family: sans-serif;
+            font-weight: bold;
+        }
+        .clear-btn:hover {
+            background-color: #000000;
+            color: #ffffff;
         }
     </style>
 </head>
@@ -125,9 +133,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="header-container">
             <h1>KindLLM</h1>
             <div class="subtitle">Minimal Reading Companion</div>
-            <form method="POST" action="/clear">
-                <button type="submit" class="clear-btn">Clear Chat Memory</button>
-            </form>
+            <!-- Converted to a clean hyperlink to avoid browser form crashes -->
+            <a href="/clear" class="clear-btn">Clear Chat Memory</a>
         </div>
         <hr>
 
