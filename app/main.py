@@ -2,19 +2,18 @@ import os
 import httpx
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from duckduckgo_search import DDGS
 import markdown
 
 app = FastAPI()
 
-# Strict minimalist prompt ensuring structural outputs
+# Restoring the clean, hyper-strict layout instructions
 SYSTEM_PROMPT = (
-    "You are a minimalist data assistant optimized for an e-ink Kindle screen.\n\n"
-    "CRITICAL RULES:\n"
+    "You are a strict, minimalist data assistant optimized for an e-ink Kindle screen.\n\n"
+    "CRITICAL MANDATES:\n"
     "1. For all structural rules, tense forms, comparisons, or differentiations, you MUST use standard markdown tables.\n"
-    "2. Always include a column for the structural sentence format/formula (e.g., S + V1 + O).\n"
-    "3. Keep text brief and structured so it scales beautifully on narrow layouts.\n"
+    "2. Always include a dedicated column explicitly showcasing the structural sentence form or formula (e.g., S + V1 + O).\n"
+    "3. Keep text inside cells brief and direct so it fits clean layouts.\n"
     "4. Do not include long conversational introduction or conclusion paragraphs."
 )
 
@@ -32,7 +31,9 @@ def search_web(query: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
     from app.templates import HTML_TEMPLATE
-    return HTML_TEMPLATE.format(inquiry="", response="")
+    # Safely replace using static substring swaps to bypass format mapping crashes
+    page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
+    return HTMLResponse(content=page)
 
 @app.post("/", response_class=HTMLResponse)
 async def handle_inquiry(inquiry: str = Form(...)):
@@ -40,7 +41,9 @@ async def handle_inquiry(inquiry: str = Form(...)):
     
     api_key = os.getenv("LLM_API_KEY")
     if not api_key:
-        return HTML_TEMPLATE.format(inquiry=inquiry, response="<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>")
+        error_html = "<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>"
+        page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
+        return HTMLResponse(content=page)
     
     search_keywords = ["search", "weather", "news", "today", "current", "latest"]
     context = ""
@@ -60,12 +63,24 @@ async def handle_inquiry(inquiry: str = Form(...)):
                 json={"model": "llama3-70b-8192", "messages": messages, "temperature": 0.2}
             )
             res_json = res.json()
-            raw_markdown = res_json["choices"][0]["message"]["content"]
             
-            # CRITICAL FIX: Explicitly compiling the markdown table structure into hard HTML elements
-            html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
-            
+            if "choices" in res_json:
+                raw_markdown = res_json["choices"][0]["message"]["content"]
+                # Explicitly compiling markdown tables with dedicated extensions
+                html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
+            else:
+                error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
+                html_response = f"<p style='color:red;'>API Error: {error_msg}</p>"
+                
     except Exception as e:
         html_response = f"<p style='color:red;'>Connection Error: {str(e)}</p>"
         
-    return HTML_TEMPLATE.format(inquiry=inquiry, response=html_response)
+    dynamic_content = f"""
+    <div class="section-label">Inquiry</div>
+    <div class="query-text">{inquiry}</div>
+    <div class="section-label">Response</div>
+    <div class="response-body">{html_response}</div>
+    """
+    
+    page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", dynamic_content)
+    return HTMLResponse(content=page)
