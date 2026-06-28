@@ -1,11 +1,15 @@
 import os
 import httpx
+import uuid
 import xml.etree.ElementTree as ET
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 import markdown
 
 app = FastAPI()
+
+# Simple in-memory storage for chat histories keyed by session ID
+SESSION_STORAGE = {}
 
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
@@ -13,45 +17,57 @@ SYSTEM_PROMPT = (
     "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
     "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix/formula layout.\n"
     "3. REAL-TIME DATA: If the user asks about current events, news, or global updates, use the attached '[Live Google News Context]' data to summarize the top breaking news stories right now. Keep it brief, factual, and direct.\n"
-    "4. Keep descriptions concise so it fits clean, narrow e-ink viewports without long paragraphs or conversational fluff."
+    "4. CONTEXT MEMORY: You have access to the conversation history. Maintain the flow of the discussion naturally when the user asks follow-up questions.\n"
+    "5. Keep descriptions concise so it fits clean, narrow e-ink viewports without long paragraphs or conversational fluff."
 )
 
 def fetch_live_news() -> str:
-    """Fetches top global headlines via Google News RSS to bypass server IP blocks."""
+    """Fetches top global headlines via Google News RSS."""
     url = "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
     try:
-        # Fetching the live open feed
         response = httpx.get(url, timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
         if response.status_code == 200:
             root = ET.fromstring(response.content)
             headlines = []
-            
-            # Loop through the first 7 trending stories in the feed
             for item in root.findall(".//item")[:7]:
                 title = item.find("title").text if item.find("title") is not None else ""
                 source = item.find("source").text if item.find("source") is not None else "Global Feed"
                 if title:
                     headlines.append(f"- Story: {title} (Source: {source})")
-                    
             if headlines:
                 return "\n\n[Live Google News Context]:\n" + "\n".join(headlines)
-    except Exception as e:
-        print(f"RSS Fetch Error: {e}")
+    except Exception:
+        pass
     return ""
 
 @app.get("/", response_class=HTMLResponse)
-async def read_index():
+async def read_index(session_id: str = Cookie(None)):
     from app.templates import HTML_TEMPLATE
-    page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
-    return HTMLResponse(content=page)
+    response = HTMLResponse(content=HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", ""))
+    
+    # Assign a unique session ID if the user doesn't have one
+    if not session_id:
+        new_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=new_id, httponly=True)
+        SESSION_STORAGE[new_id] = []
+    return response
 
 @app.get("/clear")
-async def clear_chat():
+async def clear_chat(session_id: str = Cookie(None)):
+    if session_id in SESSION_STORAGE:
+        SESSION_STORAGE[session_id] = []
     return RedirectResponse(url="/")
 
 @app.post("/", response_class=HTMLResponse)
-async def handle_inquiry(inquiry: str = Form(...)):
+async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None)):
     from app.templates import HTML_TEMPLATE
+    
+    # Ensure session tracking exists
+    if not session_id or session_id not in SESSION_STORAGE:
+        session_id = str(uuid.uuid4())
+        SESSION_STORAGE[session_id] = []
+        
+    history = SESSION_STORAGE[session_id]
     
     api_key = os.getenv("LLM_API_KEY")
     if not api_key:
@@ -59,19 +75,16 @@ async def handle_inquiry(inquiry: str = Form(...)):
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
         return HTMLResponse(content=page)
     
-    search_keywords = ["search", "weather", "news", "today", "current", "latest", "globe", "world"]
+    search_keywords = ["search", "weather", "news", "today", "current", "latest", "globe", "world", "earthquake"]
     context = ""
-    
-    # Trigger the unblockable news stream
     if any(kw in inquiry.lower() for kw in search_keywords):
         context = fetch_live_news()
-        if not context:
-            context = "\n\n[Live Google News Context]: No feed updates retrieved. Tell the user you are currently performing background server maintenance."
         
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"{inquiry}{context}"}
-    ]
+    # Append user input to ongoing memory thread
+    history.append({"role": "user", "content": f"{inquiry}{context}"})
+    
+    # Keep historical logs capped to the last 6 iterations to protect token limits
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history[-6:]
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -84,6 +97,8 @@ async def handle_inquiry(inquiry: str = Form(...)):
             
             if "choices" in res_json:
                 raw_markdown = res_json["choices"][0]["message"]["content"]
+                # Save assistant response to memory thread
+                history.append({"role": "assistant", "content": raw_markdown})
                 html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
             else:
                 error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
@@ -100,4 +115,7 @@ async def handle_inquiry(inquiry: str = Form(...)):
     """
     
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", dynamic_content)
-    return HTMLResponse(content=page)
+    response = HTMLResponse(content=page)
+    if session_id:
+        response.set_cookie(key="session_id", value=session_id, httponly=True)
+    return response
