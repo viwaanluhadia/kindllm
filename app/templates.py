@@ -55,8 +55,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .response-body {{
             margin-bottom: 40px;
         }}
-        
-        /* Table and Markdown Styling for Kindle E-Ink */
         table {{
             width: 100%;
             border-collapse: collapse;
@@ -79,7 +77,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         li {{
             margin-bottom: 5px;
         }}
-        
         .input-area {{
             margin-top: 50px;
         }}
@@ -116,17 +113,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="subtitle">Minimal Reading Companion</div>
         <hr>
 
-        if "{inquiry}"
-        <div class="section-label">Inquiry</div>
-        <div class="query-text">{inquiry}</div>
-        endif
-
-        if "{response}"
-        <div class="section-label">Response</div>
-        <div class="response-body">
-            {response}
-        </div>
-        endif
+        {content}
 
         <div class="input-area">
             <form method="POST" action="/">
@@ -137,4 +124,4 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 </body>
 </html>
-"""
+"""s
