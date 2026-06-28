@@ -18,20 +18,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             max-width: 800px;
             margin: 0 auto;
         }
-        h1 {
+        .header-container {
             text-align: center;
+            position: relative;
+            margin-bottom: 30px;
+        }
+        h1 {
             font-size: 28px;
             margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
         .subtitle {
-            text-align: center;
             font-size: 12px;
             color: #555555;
             text-transform: uppercase;
             letter-spacing: 2px;
-            margin-bottom: 30px;
+            margin-bottom: 15px;
         }
         hr {
             border: 0;
@@ -55,8 +58,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .response-body {
             margin-bottom: 40px;
         }
-        
-        /* Fixed, high-contrast grid lines for Kindle e-ink tables */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -79,7 +80,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         li {
             margin-bottom: 5px;
         }
-        
         .input-area {
             margin-top: 50px;
         }
@@ -108,12 +108,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin-top: 15px;
             letter-spacing: 1px;
         }
+        .clear-btn {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+            padding: 6px 12px;
+            font-size: 11px;
+            width: auto;
+            margin-top: 5px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>KindLLM</h1>
-        <div class="subtitle">Minimal Reading Companion</div>
+        <div class="header-container">
+            <h1>KindLLM</h1>
+            <div class="subtitle">Minimal Reading Companion</div>
+            <form method="POST" action="/clear">
+                <button type="submit" class="clear-btn">Clear Chat Memory</button>
+            </form>
+        </div>
         <hr>
 
         RENDERED_CONTENT_PLACEHOLDER
