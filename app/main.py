@@ -103,10 +103,14 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     except Exception as e:
         html_response = f"<div style='color:red;'>Connection Error: {str(e)}</div>"
         
-    # 1. Cleanly swap variables directly into the new template
-    page = HTML_TEMPLATE.replace("{inquiry}", inquiry).replace("{html_response}", html_response)
+    dynamic_content = f"""
+    <div class="section-label">Inquiry</div>
+    <div class="query-text">{inquiry}</div>
+    <div class="section-label">Response</div>
+    <div class="response-body">{html_response}</div>
+    """
     
-    # 2. Build and return the operational server response
+    page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", dynamic_content)
     response = HTMLResponse(content=page)
     if session_id:
         response.set_cookie(key="session_id", value=session_id, httponly=True)
