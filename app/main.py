@@ -10,35 +10,35 @@ app = FastAPI()
 
 SESSION_STORAGE = {}
 
+# Strict grammar formatting blueprint + explicit instruction for local data handling
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
-    "CRITICAL INPUT INTERCEPT RULES:\n"
-    "1. CASUAL CHAT: Respond to simple greetings or open thoughts with short plain text. No tables.\n"
-    "2. DICTIONARY LOOKUP: If the input is a single word or asks 'define [word]', output a markdown table with headers: | Word | Part of Speech | Pronunciation | Core Definition | Etymology/Root |.\n"
-    "3. CONCEPT COMPARISONS: If the input contains 'vs', 'difference', or 'compare', output a clean comparison markdown table evaluating key parameters side-by-side. Keep cell content ultra-short.\n"
-    "4. TEXT SIMPLIFICATION: If the input starts with 'explain:' or 'eli5:', take the following text and break it down into ultra-crisp, short bullet points using completely simple language. Strip all academic jargon.\n"
-    "5. GRAMMAR FORMULA MANDATE: When presenting tense structures, you MUST use standard explicit algebraic notation tokens: 'S', 'V1', 'V2', 'V3', 'V-ing', and 'Obj' (e.g., 'S + V1 + Obj').\n"
-    "6. NO CONVERSATIONAL FLUFF: Never output introductory or concluding remarks (e.g., 'Here is your breakdown:'). Jump directly into the raw table, code, or summary text.\n"
-    "7. CODE HANDLING: When displaying code syntax, wrap it inside standard markdown fences (e.g., ```python) so it renders in a clean monospaced font layout.\n"
-    "8. REAL-TIME DATA: Use the attached '[Live India News Context]' data to summarize top headlines if asked about current events or news.\n"
-    "9. Keep descriptions concise so it fits clean, narrow e-ink viewports without long paragraphs."
+    "CRITICAL RULES:\n"
+    "1. Respond to simple greetings, casual text, or open-ended thoughts with regular, clean plain text. Do NOT use tables for simple chat.\n"
+    "2. ONLY use a markdown table when the user explicitly asks for a table, a comparison, a differentiation, grammatical rules, or a structural matrix layout.\n"
+    "3. GRAMMAR FORMULA MANDATE: When presenting tense structures, you MUST use standard explicit algebraic notation tokens: 'S', 'V1', 'V2', 'V3', 'V-ing', and 'Obj'. (e.g., 'S + V1 + Obj' or 'S + am/is/are + V-ing + Obj'). Do not use loose text descriptive names like 'base form' or 'past form'.\n"
+    "4. REAL-TIME DATA: If the user asks about current events, news, or regional updates, use the attached '[Live India News Context]' data to summarize the top breaking news stories immediately. Keep it brief, factual, and direct.\n"
+    "5. NO CONVERSATIONAL FLUFF: Never output introductory or concluding sentences like 'Here is the table you requested' or 'I hope this helps'. Jump directly and immediately into the raw markdown answer or table structure.\n"
+    "6. CONTEXT MEMORY: You have access to the conversation history. Maintain the flow of the discussion naturally when the user asks follow-up questions.\n"
+    "7. Keep descriptions concise so it fits clean, narrow e-ink viewports without long paragraphs."
 )
 
 def fetch_live_news() -> str:
-    url = "[https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en](https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en)"
+    """Fetches top national headlines via Google News India RSS feed."""
+    # Swapped geography and edition parameters to point straight to India regional news
+    url = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"
     try:
-        with httpx.Client(trust_env=False) as client:
-            response = client.get(url, timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                headlines = []
-                for item in root.findall(".//item")[:7]:
-                    title = item.find("title").text if item.find("title") is not None else ""
-                    source = item.find("source").text if item.find("source") is not None else "National Feed"
-                    if title:
-                        headlines.append(f"- Story: {title} (Source: {source})")
-                if headlines:
-                    return "\n\n[Live India News Context]:\n" + "\n".join(headlines)
+        response = httpx.get(url, timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
+        if response.status_code == 200:
+            root = ET.fromstring(response.content)
+            headlines = []
+            for item in root.findall(".//item")[:7]:
+                title = item.find("title").text if item.find("title") is not None else ""
+                source = item.find("source").text if item.find("source") is not None else "National Feed"
+                if title:
+                    headlines.append(f"- Story: {title} (Source: {source})")
+            if headlines:
+                return "\n\n[Live India News Context]:\n" + "\n".join(headlines)
     except Exception:
         pass
     return ""
@@ -46,8 +46,7 @@ def fetch_live_news() -> str:
 @app.get("/", response_class=HTMLResponse)
 async def read_index(session_id: str = Cookie(None)):
     from app.templates import HTML_TEMPLATE
-    page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
-    response = HTMLResponse(content=page)
+    response = HTMLResponse(content=HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", ""))
     if not session_id:
         new_id = str(uuid.uuid4())
         response.set_cookie(key="session_id", value=new_id, httponly=True)
@@ -70,12 +69,9 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
         
     history = SESSION_STORAGE[session_id]
     
-    # HARDCODED BACKUP: If environment variables fail, this hardcoded key guarantees execution
-    raw_key = os.getenv("LLM_API_KEY", "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")
-    api_key = raw_key.strip().replace('"', '').replace("'", "")
-    
-    if not api_key or api_key == "PASTE_YOUR_GROQ_API_KEY_HERE":
-        error_html = "<p style='color:red;'>Error: API Key is missing or unconfigured.</p>"
+    api_key = os.getenv("LLM_API_KEY")
+    if not api_key:
+        error_html = "<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>"
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
         return HTMLResponse(content=page)
     
@@ -88,18 +84,11 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history[-6:]
     
     try:
-        endpoint_url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
-        
-        # Explicit headers mapped directly as safe literals
-        headers_dict = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.post(
-                url=endpoint_url,
-                headers=headers_dict,
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                # Set temperature to 0.0 to eliminate variance and force deterministic outputs
                 json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.0}
             )
             res_json = res.json()
