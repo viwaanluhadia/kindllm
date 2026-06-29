@@ -27,17 +27,19 @@ SYSTEM_PROMPT = (
 def fetch_live_news() -> str:
     url = "[https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en](https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en)"
     try:
-        response = httpx.get(url, timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
-        if response.status_code == 200:
-            root = ET.fromstring(response.content)
-            headlines = []
-            for item in root.findall(".//item")[:7]:
-                title = item.find("title").text if item.find("title") is not None else ""
-                source = item.find("source").text if item.find("source") is not None else "National Feed"
-                if title:
-                    headlines.append(f"- Story: {title} (Source: {source})")
-            if headlines:
-                return "\n\n[Live India News Context]:\n" + "\n".join(headlines)
+        # Bypassing host proxy variables for the RSS stream as well
+        with httpx.Client(trust_env=False) as client:
+            response = client.get(url, timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                headlines = []
+                for item in root.findall(".//item")[:7]:
+                    title = item.find("title").text if item.find("title") is not None else ""
+                    source = item.find("source").text if item.find("source") is not None else "National Feed"
+                    if title:
+                        headlines.append(f"- Story: {title} (Source: {source})")
+                if headlines:
+                    return "\n\n[Live India News Context]:\n" + "\n".join(headlines)
     except Exception:
         pass
     return ""
@@ -45,7 +47,8 @@ def fetch_live_news() -> str:
 @app.get("/", response_class=HTMLResponse)
 async def read_index(session_id: str = Cookie(None)):
     from app.templates import HTML_TEMPLATE
-    response = HTMLResponse(content=HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", ""))
+    page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
+    response = HTMLResponse(content=page)
     if not session_id:
         new_id = str(uuid.uuid4())
         response.set_cookie(key="session_id", value=new_id, httponly=True)
@@ -68,7 +71,6 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
         
     history = SESSION_STORAGE[session_id]
     
-    # Clean up the key string dynamically to strip off hidden newline tokens or carriage returns
     raw_key = os.getenv("LLM_API_KEY", "")
     api_key = raw_key.strip().replace('"', '').replace("'", "")
     
@@ -86,10 +88,10 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history[-6:]
     
     try:
-        # Hardcoding the literal endpoint target string directly to completely rule out URL token parsing corruption
         endpoint_url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # CRITICAL FIX: trust_env=False explicitly isolates the network from broken system variables
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
             res = await client.post(
                 url=endpoint_url,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
