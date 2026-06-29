@@ -10,7 +10,6 @@ app = FastAPI()
 
 SESSION_STORAGE = {}
 
-# Master Prompt upgraded to handle: Tenses, Comparisons, Dictionary lookup, Codeblocks, and Simplification
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
     "CRITICAL INPUT INTERCEPT RULES:\n"
@@ -69,7 +68,10 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
         
     history = SESSION_STORAGE[session_id]
     
-    api_key = os.getenv("LLM_API_KEY")
+    # Clean up the key string dynamically to strip off hidden newline tokens or carriage returns
+    raw_key = os.getenv("LLM_API_KEY", "")
+    api_key = raw_key.strip().replace('"', '').replace("'", "")
+    
     if not api_key:
         error_html = "<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>"
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
@@ -84,9 +86,12 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history[-6:]
     
     try:
+        # Hardcoding the literal endpoint target string directly to completely rule out URL token parsing corruption
+        endpoint_url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
+        
         async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.post(
-                "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)",
+                url=endpoint_url,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.0}
             )
@@ -95,7 +100,6 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
             if "choices" in res_json:
                 raw_markdown = res_json["choices"][0]["message"]["content"]
                 history.append({"role": "assistant", "content": raw_markdown})
-                # Enabled fenced_code extension alongside tables for beautiful syntax boxes
                 html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
             else:
                 error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
