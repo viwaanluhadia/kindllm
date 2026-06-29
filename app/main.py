@@ -27,7 +27,6 @@ SYSTEM_PROMPT = (
 def fetch_live_news() -> str:
     url = "[https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en](https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en)"
     try:
-        # Bypassing host proxy variables for the RSS stream as well
         with httpx.Client(trust_env=False) as client:
             response = client.get(url, timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
             if response.status_code == 200:
@@ -71,11 +70,12 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
         
     history = SESSION_STORAGE[session_id]
     
-    raw_key = os.getenv("LLM_API_KEY", "")
+    # HARDCODED BACKUP: If environment variables fail, this hardcoded key guarantees execution
+    raw_key = os.getenv("LLM_API_KEY", "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")
     api_key = raw_key.strip().replace('"', '').replace("'", "")
     
-    if not api_key:
-        error_html = "<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>"
+    if not api_key or api_key == "PASTE_YOUR_GROQ_API_KEY_HERE":
+        error_html = "<p style='color:red;'>Error: API Key is missing or unconfigured.</p>"
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
         return HTMLResponse(content=page)
     
@@ -90,11 +90,16 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     try:
         endpoint_url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
         
-        # CRITICAL FIX: trust_env=False explicitly isolates the network from broken system variables
+        # Explicit headers mapped directly as safe literals
+        headers_dict = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
         async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
             res = await client.post(
                 url=endpoint_url,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                headers=headers_dict,
                 json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.0}
             )
             res_json = res.json()
