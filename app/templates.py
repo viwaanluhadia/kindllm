@@ -18,23 +18,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             max-width: 800px;
             margin: 0 auto;
         }
-        .header-container {
-            text-align: center;
-            position: relative;
-            margin-bottom: 30px;
-        }
         h1 {
+            text-align: center;
             font-size: 28px;
             margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
         .subtitle {
+            text-align: center;
             font-size: 12px;
             color: #555555;
             text-transform: uppercase;
             letter-spacing: 2px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .clear-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .clear-btn {
+            background: none;
+            border: 1px solid #000000;
+            color: #000000;
+            padding: 5px 15px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
         }
         hr {
             border: 0;
@@ -80,6 +93,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         li {
             margin-bottom: 5px;
         }
+        
+        /* High-contrast, scannable code layout block for Kindle */
+        pre {
+            background-color: #f9f9f9;
+            border: 1px dashed #000000;
+            padding: 15px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 15px;
+            font-weight: bold;
+            color: #000000;
+        }
+        
         .input-area {
             margin-top: 50px;
         }
@@ -108,32 +137,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin-top: 15px;
             letter-spacing: 1px;
         }
-        .clear-btn {
-            display: inline-block;
-            background-color: #ffffff;
-            color: #000000;
-            border: 1px solid #000000;
-            padding: 6px 12px;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-decoration: none;
-            margin-top: 5px;
-            font-family: sans-serif;
-            font-weight: bold;
-        }
-        .clear-btn:hover {
-            background-color: #000000;
-            color: #ffffff;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header-container">
-            <h1>KindLLM</h1>
-            <div class="subtitle">Minimal Reading Companion</div>
-            <!-- Converted to a clean hyperlink to avoid browser form crashes -->
+        <h1>KindLLM</h1>
+        <div class="subtitle">Minimal Reading Companion</div>
+        <div class="clear-container">
             <a href="/clear" class="clear-btn">Clear Chat Memory</a>
         </div>
         <hr>
