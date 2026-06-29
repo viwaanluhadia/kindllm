@@ -54,28 +54,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-top: 1px solid #000000;
             margin-bottom: 30px;
         }
-        .header-inline {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 5px;
-        }
         .section-label {
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #333333;
             font-weight: bold;
-        }
-        .copy-btn {
-            background: none;
-            border: 1px dashed #000000;
-            color: #000000;
-            padding: 2px 8px;
-            font-size: 10px;
-            text-transform: uppercase;
-            cursor: pointer;
-            font-family: Georgia, serif;
+            margin-bottom: 5px;
         }
         .query-text {
             font-style: italic;
@@ -150,25 +135,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             letter-spacing: 1px;
         }
     </style>
-    <script>
-        function copyToClipboard() {
-            const responseElement = document.getElementById('response-text');
-            if (!responseElement) return;
-            
-            // Extracts plain text from the rendered HTML content container safely
-            const textToCopy = responseElement.innerText;
-            
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                const btn = document.getElementById('copy-button');
-                btn.innerText = 'Copied!';
-                setTimeout(() => {
-                    btn.innerText = 'Copy';
-                }, 2000);
-            }).catch(err => {
-                console.error('Could not copy text: ', err);
-            });
-        }
-    </script>
 </head>
 <body>
     <div class="container">
@@ -179,14 +145,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
         <hr>
 
-        <div class="section-label">Inquiry</div>
-        <div class="query-text">{inquiry}</div>
-        
-        <div class="header-inline">
-            <div class="section-label">Response</div>
-            <button id="copy-button" class="copy-btn" onclick="copyToClipboard()">Copy</button>
-        </div>
-        <div id="response-text" class="response-body">{html_response}</div>
+        RENDERED_CONTENT_PLACEHOLDER
 
         <div class="input-area">
             <form method="POST" action="/">
