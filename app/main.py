@@ -10,7 +10,6 @@ app = FastAPI()
 
 SESSION_STORAGE = {}
 
-# Rebalanced Rule 1 to ensure standard prose reads naturally under headings, limiting bullets to real lists
 SYSTEM_PROMPT = (
     "You are a minimalist, highly efficient reading companion optimized for a Kindle screen.\n\n"
     "CRITICAL RESPONDING RULES:\n"
@@ -44,6 +43,7 @@ def search_web(query: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 async def read_index(session_id: str = Cookie(None)):
     from app.templates import HTML_TEMPLATE
+    # Explicitly clear out any placeholder data issues
     page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", "")
     response = HTMLResponse(content=page)
     if not session_id:
@@ -70,7 +70,7 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     
     api_key = os.getenv("LLM_API_KEY")
     if not api_key:
-        error_html = "<p style='color:red;'>Error: LLM_API_KEY environment variable is missing.</p>"
+        error_html = "<div style='color:red;'>Error: LLM_API_KEY is missing.</div>"
         page = HTML_TEMPLATE.replace("RENDERED_CONTENT_PLACEHOLDER", error_html)
         return HTMLResponse(content=page)
     
@@ -97,10 +97,10 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
                 html_response = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
             else:
                 error_msg = res_json.get("error", {}).get("message", "Unknown API Response")
-                html_response = f"<p style='color:red;'>API Error: {error_msg}</p>"
+                html_response = f"<div style='color:red;'>API Error: {error_msg}</div>"
                 
     except Exception as e:
-        html_response = f"<p style='color:red;'>Connection Error: {str(e)}</p>"
+        html_response = f"<div style='color:red;'>Connection Error: {str(e)}</div>"
         
     dynamic_content = f"""
     <div class="section-label">Inquiry</div>
@@ -113,3 +113,4 @@ async def handle_inquiry(inquiry: str = Form(...), session_id: str = Cookie(None
     response = HTMLResponse(content=page)
     if session_id:
         response.set_cookie(key="session_id", value=session_id, httponly=True)
+    return response
